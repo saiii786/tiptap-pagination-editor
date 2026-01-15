@@ -58,7 +58,6 @@ const PageBreak = Node.create({
   },
 });
 
-// Custom Spacer Node - FIXED VERSION
 const Spacer = Node.create({
   name: 'spacer',
   group: 'block',
@@ -71,7 +70,7 @@ const Spacer = Node.create({
         default: 0,
         parseHTML: element => parseFloat(element.style.height) || 0,
         renderHTML: attributes => ({
-          style: `height: ${attributes.height}px; min-height: ${attributes.height}px;`
+          style: `height: ${attributes.height}px; min-height: ${attributes.height}px;`,
         }),
       },
     };
@@ -89,7 +88,6 @@ const Spacer = Node.create({
     return ['div', { 'data-type': 'spacer', ...HTMLAttributes }, 0];
   },
 });
-
 // Free Cursor Extension (unchanged)
 const FreeCursor = Extension.create({
   name: 'freeCursor',
