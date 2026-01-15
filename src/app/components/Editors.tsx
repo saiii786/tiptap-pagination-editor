@@ -21,6 +21,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useState, useEffect, useRef } from "react";
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+
+declare global {
+  interface Window {
+    html2canvas: typeof html2canvas;
+  }
+}
+
 // ──────────────────────────────────────────────
 // Constants
 // ──────────────────────────────────────────────
@@ -215,11 +222,11 @@ const MenuBar = ({ editor, title, setTitle, fontFamily, setFontFamily, fontSize,
   // ──────────────────────────────────────────────
   const handlePrintPreview = () => {
     if (!editor) return;
-  
+ 
     // 1. Prepare Content
     const content = editor.getHTML();
     const cleanContent = cleanHTML(content);
-  
+ 
     // 2. Open Window
     const printWindow = window.open("", "_blank", "width=900,height=800,scrollbars=yes");
     if (!printWindow) return;
@@ -329,7 +336,7 @@ const MenuBar = ({ editor, title, setTitle, fontFamily, setFontFamily, fontSize,
             h1 { font-size: 2em; font-weight: bold; }
             h2 { font-size: 1.5em; font-weight: bold; }
             img { max-width: 100%; height: auto; }
-          
+         
             button {
               background: #007bff;
               color: white;
@@ -342,7 +349,7 @@ const MenuBar = ({ editor, title, setTitle, fontFamily, setFontFamily, fontSize,
             }
             button:hover { background: #0056b3; }
             button.secondary { background: #6c757d; margin-right: 10px; }
-          
+         
             /* Print Specifics to hide toolbar */
             @media print {
               .toolbar { display: none; }
@@ -382,7 +389,7 @@ const MenuBar = ({ editor, title, setTitle, fontFamily, setFontFamily, fontSize,
                   format: 'letter'
                 });
                 const element = document.getElementById('document-content');
-              
+             
                 // We use html2canvas to render the visual layout exactly
                 await doc.html(element, {
                   callback: function(pdf) {
@@ -582,11 +589,11 @@ const MenuBar = ({ editor, title, setTitle, fontFamily, setFontFamily, fontSize,
             <Redo className="h-4 w-4" />
           </Button>
           <Separator orientation="vertical" className="h-6" />
-        
+       
           <Button variant="outline" size="sm" onClick={handlePrintPreview}>
             <Printer className="h-4 w-4 mr-2" />Preview & PDF
           </Button>
-        
+       
           <Button variant="outline" size="sm" onClick={handleExportPDF}>
             <FileText className="h-4 w-4 mr-2" />PDF (Direct)
           </Button>
@@ -744,11 +751,11 @@ export default function Editors() {
     if (!drawingMode || !canvasRef.current || !paperRef.current) return;
     const canvas = canvasRef.current;
     const paper = paperRef.current;
-  
+ 
     // Set canvas dimensions to match the WHITE PAPER, not the screen
     canvas.width = paper.offsetWidth;
     canvas.height = paper.offsetHeight;
-  
+ 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     // CALCULATE DEAD ZONES IN PIXELS
@@ -807,7 +814,7 @@ export default function Editors() {
     const dataUrl = canvasRef.current.toDataURL('image/png');
     editor.commands.setImage({ src: dataUrl });
     setDrawingMode(false);
-  
+ 
     // Clear canvas
     const ctx = canvasRef.current.getContext('2d');
     ctx?.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
@@ -836,7 +843,7 @@ export default function Editors() {
             className="max-w-[215.9mm] mx-auto bg-white shadow-lg relative prose prose-sm sm:prose lg:prose-lg"
           >
             <EditorContent editor={editor} />
-          
+         
             {drawingMode && (
               <>
                 {/* Canvas Overlay - strictly positioned over the paper */}
@@ -845,7 +852,7 @@ export default function Editors() {
                   className="absolute inset-0 z-10 pointer-events-auto"
                   style={{ cursor: 'crosshair' }}
                 />
-              
+             
                 {/* Floating Action Button for Done */}
                 <Button
                   onClick={handleInsertDrawing}
