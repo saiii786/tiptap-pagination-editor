@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState, useEffect, useRef } from "react";
 import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 // ──────────────────────────────────────────────
 // Constants
 // ──────────────────────────────────────────────
@@ -189,6 +190,11 @@ const MenuBar = ({ editor, title, setTitle, fontFamily, setFontFamily, fontSize,
       editor?.commands.insertContent(transcript);
     };
   }, [editor]);
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.html2canvas = html2canvas;
+    }
+  }, []);
   const toggleDictation = () => {
     if (!editor) return;
     if (isListening) {
@@ -209,11 +215,11 @@ const MenuBar = ({ editor, title, setTitle, fontFamily, setFontFamily, fontSize,
   // ──────────────────────────────────────────────
   const handlePrintPreview = () => {
     if (!editor) return;
-   
+  
     // 1. Prepare Content
     const content = editor.getHTML();
     const cleanContent = cleanHTML(content);
-   
+  
     // 2. Open Window
     const printWindow = window.open("", "_blank", "width=900,height=800,scrollbars=yes");
     if (!printWindow) return;
@@ -323,7 +329,7 @@ const MenuBar = ({ editor, title, setTitle, fontFamily, setFontFamily, fontSize,
             h1 { font-size: 2em; font-weight: bold; }
             h2 { font-size: 1.5em; font-weight: bold; }
             img { max-width: 100%; height: auto; }
-           
+          
             button {
               background: #007bff;
               color: white;
@@ -336,7 +342,7 @@ const MenuBar = ({ editor, title, setTitle, fontFamily, setFontFamily, fontSize,
             }
             button:hover { background: #0056b3; }
             button.secondary { background: #6c757d; margin-right: 10px; }
-           
+          
             /* Print Specifics to hide toolbar */
             @media print {
               .toolbar { display: none; }
@@ -376,7 +382,7 @@ const MenuBar = ({ editor, title, setTitle, fontFamily, setFontFamily, fontSize,
                   format: 'letter'
                 });
                 const element = document.getElementById('document-content');
-               
+              
                 // We use html2canvas to render the visual layout exactly
                 await doc.html(element, {
                   callback: function(pdf) {
@@ -415,7 +421,7 @@ const MenuBar = ({ editor, title, setTitle, fontFamily, setFontFamily, fontSize,
   // ──────────────────────────────────────────────
   // DIRECT EXPORT TO PDF (Main Page Button)
   // ──────────────────────────────────────────────
-  // Updated with Pixel-to-MM mapping to prevent empty pages/cutoff
+  // Updated with manual pagination for consistency and to prevent cutoffs
   const handleExportPDF = async () => {
     if (!editor) return;
     // 1. Setup jsPDF
@@ -424,62 +430,99 @@ const MenuBar = ({ editor, title, setTitle, fontFamily, setFontFamily, fontSize,
       unit: 'mm',
       format: 'letter' // [215.9, 279.4]
     });
-    // 2. Prepare content
-    const content = cleanHTML(editor.getHTML());
-   
-    // 3. Create a temporary container for rendering
-    // We use PX here to ensure the browser layout engine renders it exactly as seen on screen.
-    // 1 mm = 3.7795 px (at 96 DPI)
-    const contentWidthMM = PAGE_WIDTH_MM - (2 * MARGIN_LEFT_RIGHT_MM); // ~155.1mm
-    const contentWidthPX = contentWidthMM * 3.7795; // Convert to pixels for the DOM element
-    const tempContainer = document.createElement('div');
-    tempContainer.style.width = `${contentWidthPX}px`;
-    tempContainer.style.padding = '0';
-    tempContainer.style.margin = '0';
-    tempContainer.style.background = '#ffffff';
-    tempContainer.style.fontFamily = fontFamily;
-    tempContainer.style.fontSize = `${fontSize}pt`;
-    // Ensure text wraps exactly like the editor
-    tempContainer.style.lineHeight = '1.5';
-    tempContainer.style.color = '#000000';
-    tempContainer.style.position = 'absolute';
-    tempContainer.style.left = '-9999px';
-    tempContainer.style.top = '0';
-    // Vital: Allow height to expand infinitely so html2canvas sees everything
-    tempContainer.style.height = 'auto';
-    tempContainer.style.overflow = 'visible';
-    // Inject styles
-    tempContainer.innerHTML = `
-      <style>
-        p { margin-bottom: 0.5em; margin-top: 0; }
-        h1 { font-size: 2em; font-weight: bold; margin-bottom: 0.5em; margin-top: 0; }
-        h2 { font-size: 1.5em; font-weight: bold; margin-bottom: 0.5em; margin-top: 0; }
-        ul, ol { margin-left: 1.5em; margin-bottom: 0.5em; }
-        img { max-width: 100%; height: auto; }
-      </style>
-      ${content}
-    `;
-    document.body.appendChild(tempContainer);
-    // 4. Render
-    // We tell jsPDF: "Take this HTML (rendered at windowWidth pixels) and fit it into 'width' mm on the PDF"
-    await doc.html(tempContainer, {
-      callback: (pdf) => {
-        pdf.save(`${title || 'document'}.pdf`);
-        document.body.removeChild(tempContainer);
-      },
-      x: MARGIN_LEFT_RIGHT_MM,
-      y: MARGIN_TOP_BOTTOM_MM,
-      width: contentWidthMM, // Target width in the PDF (155.1mm)
-      windowWidth: contentWidthPX, // Input width in pixels (ensures layout matches)
-      margin: [MARGIN_TOP_BOTTOM_MM, MARGIN_LEFT_RIGHT_MM, MARGIN_TOP_BOTTOM_MM, MARGIN_LEFT_RIGHT_MM],
-      autoPaging: 'text',
-      html2canvas: {
-        scale: 1, // Let jsPDF calculate the scale based on the width parameter
-        useCORS: true,
-        logging: false,
-        letterRendering: true, // Improves font rendering
+    // 2. Prepare full content
+    const fullContent = cleanHTML(editor.getHTML());
+    // 3. Calculate pages (same as preview)
+    const contentWidthMM = PAGE_WIDTH_MM - (2 * MARGIN_LEFT_RIGHT_MM);
+    const contentWidthPX = contentWidthMM * PX_PER_MM;
+    const pageContentHeight = PAGE_CONTENT_HEIGHT_PX;
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = fullContent;
+    tempDiv.style.width = `${contentWidthMM}mm`;
+    tempDiv.style.fontFamily = fontFamily;
+    tempDiv.style.fontSize = `${fontSize}pt`;
+    tempDiv.style.visibility = 'hidden';
+    document.body.appendChild(tempDiv);
+    let pages: string[] = [];
+    let currentPage = '';
+    let currentHeight = 0;
+    Array.from(tempDiv.childNodes).forEach((node: any) => {
+      const clone = node.cloneNode(true);
+      const measurer = document.createElement('div');
+      measurer.appendChild(clone);
+      measurer.style.position = 'absolute';
+      measurer.style.visibility = 'hidden';
+      measurer.style.width = tempDiv.style.width;
+      measurer.style.fontFamily = tempDiv.style.fontFamily;
+      measurer.style.fontSize = tempDiv.style.fontSize;
+      measurer.style.lineHeight = '1.5';
+      document.body.appendChild(measurer);
+      const h = measurer.offsetHeight || 20;
+      document.body.removeChild(measurer);
+      if (currentHeight + h > pageContentHeight && currentPage) {
+        pages.push(currentPage);
+        currentPage = '';
+        currentHeight = 0;
       }
+      currentPage += node.outerHTML || '';
+      currentHeight += h;
     });
+    if (currentPage) pages.push(currentPage);
+    document.body.removeChild(tempDiv);
+    // 4. Render each page separately
+    for (let i = 0; i < pages.length; i++) {
+      if (i > 0) {
+        doc.addPage();
+      }
+      const pageContent = pages[i];
+      const tempContainer = document.createElement('div');
+      tempContainer.style.width = `${contentWidthPX}px`;
+      tempContainer.style.padding = '0';
+      tempContainer.style.margin = '0';
+      tempContainer.style.background = '#ffffff';
+      tempContainer.style.fontFamily = fontFamily;
+      tempContainer.style.fontSize = `${fontSize}pt`;
+      tempContainer.style.lineHeight = '1.5';
+      tempContainer.style.color = '#000000';
+      tempContainer.style.position = 'absolute';
+      tempContainer.style.left = '-9999px';
+      tempContainer.style.top = '0';
+      tempContainer.style.height = 'auto';
+      tempContainer.style.overflow = 'visible';
+      tempContainer.innerHTML = `
+        <style>
+          p { margin-bottom: 0.5em; margin-top: 0; }
+          h1 { font-size: 2em; font-weight: bold; margin-bottom: 0.5em; margin-top: 0; }
+          h2 { font-size: 1.5em; font-weight: bold; margin-bottom: 0.5em; margin-top: 0; }
+          ul, ol { margin-left: 1.5em; margin-bottom: 0.5em; }
+          img { max-width: 100%; height: auto; }
+        </style>
+        ${pageContent}
+      `;
+      document.body.appendChild(tempContainer);
+      await doc.html(tempContainer, {
+        x: MARGIN_LEFT_RIGHT_MM,
+        y: MARGIN_TOP_BOTTOM_MM,
+        width: contentWidthMM,
+        windowWidth: contentWidthPX,
+        html2canvas: {
+          scale: 1,
+          useCORS: true,
+          logging: false,
+          letterRendering: true,
+        }
+      });
+      // Add page number
+      doc.setFontSize(10);
+      doc.setTextColor(136, 136, 136);
+      const pageNumText = `Page ${i + 1}`;
+      const textWidth = doc.getTextWidth(pageNumText);
+      const pageWidth = doc.internal.pageSize.getWidth();
+      doc.text(pageNumText, (pageWidth - textWidth) / 2, PAGE_HEIGHT_MM - 15);
+      document.body.removeChild(tempContainer);
+    }
+    // 5. Save the PDF
+    doc.save(`${title || 'document'}.pdf`);
   };
   if (!editor) {
     return (
@@ -539,11 +582,11 @@ const MenuBar = ({ editor, title, setTitle, fontFamily, setFontFamily, fontSize,
             <Redo className="h-4 w-4" />
           </Button>
           <Separator orientation="vertical" className="h-6" />
-         
+        
           <Button variant="outline" size="sm" onClick={handlePrintPreview}>
             <Printer className="h-4 w-4 mr-2" />Preview & PDF
           </Button>
-         
+        
           <Button variant="outline" size="sm" onClick={handleExportPDF}>
             <FileText className="h-4 w-4 mr-2" />PDF (Direct)
           </Button>
@@ -701,11 +744,11 @@ export default function Editors() {
     if (!drawingMode || !canvasRef.current || !paperRef.current) return;
     const canvas = canvasRef.current;
     const paper = paperRef.current;
-   
+  
     // Set canvas dimensions to match the WHITE PAPER, not the screen
     canvas.width = paper.offsetWidth;
     canvas.height = paper.offsetHeight;
-   
+  
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     // CALCULATE DEAD ZONES IN PIXELS
@@ -764,7 +807,7 @@ export default function Editors() {
     const dataUrl = canvasRef.current.toDataURL('image/png');
     editor.commands.setImage({ src: dataUrl });
     setDrawingMode(false);
-   
+  
     // Clear canvas
     const ctx = canvasRef.current.getContext('2d');
     ctx?.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
@@ -793,7 +836,7 @@ export default function Editors() {
             className="max-w-[215.9mm] mx-auto bg-white shadow-lg relative prose prose-sm sm:prose lg:prose-lg"
           >
             <EditorContent editor={editor} />
-           
+          
             {drawingMode && (
               <>
                 {/* Canvas Overlay - strictly positioned over the paper */}
@@ -802,7 +845,7 @@ export default function Editors() {
                   className="absolute inset-0 z-10 pointer-events-auto"
                   style={{ cursor: 'crosshair' }}
                 />
-               
+              
                 {/* Floating Action Button for Done */}
                 <Button
                   onClick={handleInsertDrawing}
