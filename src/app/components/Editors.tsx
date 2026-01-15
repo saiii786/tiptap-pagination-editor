@@ -1,5 +1,4 @@
 "use client";
-
 import { useEditor, EditorContent } from "@tiptap/react";
 import { Extension, Node } from "@tiptap/core";
 import { Plugin, TextSelection } from "@tiptap/pm/state";
@@ -20,20 +19,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState, useEffect, useRef } from "react";
-import jsPDF from 'jspdf'; 
-
+import jsPDF from 'jspdf';
 // ──────────────────────────────────────────────
 // Constants
 // ──────────────────────────────────────────────
 const PAGE_WIDTH_MM = 215.9;
 const PAGE_HEIGHT_MM = 279.4;
-const MARGIN_TOP_BOTTOM_MM = 35.4;     
-const MARGIN_LEFT_RIGHT_MM = 30.4;     
+const MARGIN_TOP_BOTTOM_MM = 35.4;
+const MARGIN_LEFT_RIGHT_MM = 30.4;
 const PX_PER_MM = 3.7795;
 const PAGE_CONTENT_HEIGHT_PX = (PAGE_HEIGHT_MM * PX_PER_MM) - (2 * (MARGIN_TOP_BOTTOM_MM * PX_PER_MM));
-
-const AVG_SPACE_WIDTH_FACTOR = 0.25; 
-
+const AVG_SPACE_WIDTH_FACTOR = 0.25;
 // Templates
 const templates: Record<string, string> = {
   officialLetter: `<h1>[Company Name]</h1>
@@ -44,7 +40,6 @@ const templates: Record<string, string> = {
 <p>[Body of letter...]</p>
 <p>Sincerely,<br>[Your Name]<br>[Your Title]</p>`,
 };
-
 // Custom Page Break Node
 const PageBreak = Node.create({
   name: 'pageBreak',
@@ -57,13 +52,11 @@ const PageBreak = Node.create({
     return ['div', { 'data-type': 'page-break', class: 'page-break' }];
   },
 });
-
 const Spacer = Node.create({
   name: 'spacer',
   group: 'block',
   atom: true,
   draggable: true,
-
   addAttributes() {
     return {
       height: {
@@ -75,7 +68,6 @@ const Spacer = Node.create({
       },
     };
   },
-
   parseHTML() {
     return [
       {
@@ -83,7 +75,6 @@ const Spacer = Node.create({
       },
     ];
   },
-
   renderHTML({ HTMLAttributes }) {
     return ['div', { 'data-type': 'spacer', ...HTMLAttributes }, 0];
   },
@@ -101,18 +92,15 @@ const FreeCursor = Extension.create({
             const paddingLeft = parseFloat(getComputedStyle(view.dom).paddingLeft);
             const paddingRight = parseFloat(getComputedStyle(view.dom).paddingRight);
             const contentWidth = pmRect.width - paddingLeft - paddingRight;
-
             if (
               event.clientX < pmRect.left + paddingLeft ||
               event.clientX > pmRect.left + paddingLeft + contentWidth
             ) {
-              return true; 
+              return true;
             }
-
             const coordResult = view.posAtCoords({ left: event.clientX, top: event.clientY });
             if (!coordResult) return false;
             const { pos: clickPos, inside } = coordResult;
-
             if (inside >= 0) {
               const tr = view.state.tr;
               tr.setSelection(TextSelection.create(doc, clickPos));
@@ -120,7 +108,6 @@ const FreeCursor = Extension.create({
               view.focus();
               return true;
             }
-
             if (clickPos >= doc.content.size) {
               const endCoord = view.coordsAtPos(doc.content.size);
               const addHeight = event.clientY - endCoord.top;
@@ -132,7 +119,6 @@ const FreeCursor = Extension.create({
                 const spaceWidthPx = fontSizePt * AVG_SPACE_WIDTH_FACTOR;
                 const numSpaces = Math.floor(horizontalOffsetPx / spaceWidthPx);
                 const paddingSpaces = '\u00A0'.repeat(numSpaces);
-
                 const para = view.state.schema.nodes.paragraph.create(null, view.state.schema.text(paddingSpaces));
                 tr.insert(doc.content.size, [spacer, para]);
                 const cursorPos = doc.content.size + spacer.nodeSize + numSpaces + 1;
@@ -143,7 +129,6 @@ const FreeCursor = Extension.create({
               }
               return false;
             }
-
             const nodeAt = doc.nodeAt(clickPos);
             if (nodeAt && nodeAt.type.name === 'spacer') {
               const dom = view.nodeDOM(clickPos);
@@ -151,7 +136,6 @@ const FreeCursor = Extension.create({
               const rect = (dom as HTMLElement).getBoundingClientRect();
               const relativeY = event.clientY - rect.top;
               const totalH = nodeAt.attrs.height;
-
               if (relativeY >= 0 && relativeY <= totalH) {
                 const tr = view.state.tr;
                 const spacerAbove = relativeY > 0 ? view.state.schema.nodes.spacer.create({ height: relativeY }) : null;
@@ -161,14 +145,12 @@ const FreeCursor = Extension.create({
                 const spaceWidthPx = fontSizePt * AVG_SPACE_WIDTH_FACTOR;
                 const numSpaces = Math.floor(horizontalOffsetPx / spaceWidthPx);
                 const paddingSpaces = '\u00A0'.repeat(numSpaces);
-
                 const para = view.state.schema.nodes.paragraph.create(null, view.state.schema.text(paddingSpaces));
                 const fragment: any[] = [];
                 if (spacerAbove) fragment.push(spacerAbove);
                 fragment.push(para);
                 if (spacerBelow) fragment.push(spacerBelow);
                 tr.replaceWith(clickPos, clickPos + nodeAt.nodeSize, fragment);
-
                 let offset = 0;
                 if (spacerAbove) offset += spacerAbove.nodeSize;
                 const paraStart = clickPos + offset;
@@ -179,7 +161,6 @@ const FreeCursor = Extension.create({
                 return true;
               }
             }
-
             return false;
           },
         },
@@ -187,23 +168,19 @@ const FreeCursor = Extension.create({
     ];
   },
 });
-
 // ──────────────────────────────────────────────
 // Menu Bar Component
 // ──────────────────────────────────────────────
 const MenuBar = ({ editor, title, setTitle, fontFamily, setFontFamily, fontSize, setFontSize, drawingMode, toggleDrawingMode, toggleTemplateDialog }: any) => {
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<any>(null);
-
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) return;
-
     recognitionRef.current = new SpeechRecognition();
     recognitionRef.current.continuous = true;
     recognitionRef.current.interimResults = true;
-
     recognitionRef.current.onresult = (event: any) => {
       const transcript = Array.from(event.results)
         .map((result: any) => result[0])
@@ -212,7 +189,6 @@ const MenuBar = ({ editor, title, setTitle, fontFamily, setFontFamily, fontSize,
       editor?.commands.insertContent(transcript);
     };
   }, [editor]);
-
   const toggleDictation = () => {
     if (!editor) return;
     if (isListening) {
@@ -222,28 +198,25 @@ const MenuBar = ({ editor, title, setTitle, fontFamily, setFontFamily, fontSize,
     }
     setIsListening(prev => !prev);
   };
-
   const cleanHTML = (html: string) => {
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = html;
     tempDiv.querySelectorAll('.page-break, [data-type="page-break"]').forEach(el => el.remove());
     return tempDiv.innerHTML;
   };
-
   // ──────────────────────────────────────────────
   // PREVIEW WINDOW LOGIC (With Visual Pagination)
   // ──────────────────────────────────────────────
   const handlePrintPreview = () => {
     if (!editor) return;
-    
+   
     // 1. Prepare Content
     const content = editor.getHTML();
     const cleanContent = cleanHTML(content);
-    
+   
     // 2. Open Window
     const printWindow = window.open("", "_blank", "width=900,height=800,scrollbars=yes");
     if (!printWindow) return;
-
     // 3. Calculate Pages (Simulate Pagination)
     const pageContentHeight = PAGE_CONTENT_HEIGHT_PX;
     const tempDiv = document.createElement('div');
@@ -254,11 +227,9 @@ const MenuBar = ({ editor, title, setTitle, fontFamily, setFontFamily, fontSize,
     tempDiv.style.fontSize = `${fontSize}pt`;
     tempDiv.style.visibility = 'hidden';
     document.body.appendChild(tempDiv);
-
     let pages: string[] = [];
     let currentPage = '';
     let currentHeight = 0;
-
     Array.from(tempDiv.childNodes).forEach((node: any) => {
       const clone = node.cloneNode(true);
       const measurer = document.createElement('div');
@@ -272,7 +243,6 @@ const MenuBar = ({ editor, title, setTitle, fontFamily, setFontFamily, fontSize,
       document.body.appendChild(measurer);
       const h = measurer.offsetHeight || 20;
       document.body.removeChild(measurer);
-
       if (currentHeight + h > pageContentHeight && currentPage) {
         pages.push(currentPage);
         currentPage = '';
@@ -283,7 +253,6 @@ const MenuBar = ({ editor, title, setTitle, fontFamily, setFontFamily, fontSize,
     });
     if (currentPage) pages.push(currentPage);
     document.body.removeChild(tempDiv);
-
     // 4. Construct Preview HTML
     // We add Scripts for jsPDF and html2canvas via CDN so the popup works independently
     printWindow.document.write(`
@@ -354,7 +323,7 @@ const MenuBar = ({ editor, title, setTitle, fontFamily, setFontFamily, fontSize,
             h1 { font-size: 2em; font-weight: bold; }
             h2 { font-size: 1.5em; font-weight: bold; }
             img { max-width: 100%; height: auto; }
-            
+           
             button {
               background: #007bff;
               color: white;
@@ -367,7 +336,7 @@ const MenuBar = ({ editor, title, setTitle, fontFamily, setFontFamily, fontSize,
             }
             button:hover { background: #0056b3; }
             button.secondary { background: #6c757d; margin-right: 10px; }
-            
+           
             /* Print Specifics to hide toolbar */
             @media print {
               .toolbar { display: none; }
@@ -385,7 +354,6 @@ const MenuBar = ({ editor, title, setTitle, fontFamily, setFontFamily, fontSize,
               <button id="export-pdf-btn">Export PDF</button>
             </div>
           </div>
-
           <div id="document-content" class="page-wrapper">
             ${pages.map((p, i) => `
               <div class="page-container">
@@ -394,14 +362,12 @@ const MenuBar = ({ editor, title, setTitle, fontFamily, setFontFamily, fontSize,
               </div>
             `).join('')}
           </div>
-
           <script>
             document.getElementById('export-pdf-btn').addEventListener('click', async () => {
               const btn = document.getElementById('export-pdf-btn');
               const originalText = btn.innerText;
               btn.innerText = "Generating...";
               btn.disabled = true;
-
               try {
                 const { jsPDF } = window.jspdf;
                 const doc = new jsPDF({
@@ -409,17 +375,16 @@ const MenuBar = ({ editor, title, setTitle, fontFamily, setFontFamily, fontSize,
                   unit: 'mm',
                   format: 'letter'
                 });
-
                 const element = document.getElementById('document-content');
-                
+               
                 // We use html2canvas to render the visual layout exactly
                 await doc.html(element, {
                   callback: function(pdf) {
                     pdf.save('${title || 'document'}.pdf');
                     btn.innerText = "Done!";
-                    setTimeout(() => { 
-                      btn.innerText = originalText; 
-                      btn.disabled = false; 
+                    setTimeout(() => {
+                      btn.innerText = originalText;
+                      btn.disabled = false;
                     }, 2000);
                   },
                   x: 0,
@@ -434,7 +399,6 @@ const MenuBar = ({ editor, title, setTitle, fontFamily, setFontFamily, fontSize,
                   margin: [0, 0, 0, 0], // Margins are already handled by CSS padding in .content-area
                   autoPaging: 'text'
                 });
-
               } catch (err) {
                 console.error(err);
                 alert("Error generating PDF: " + err.message);
@@ -448,32 +412,28 @@ const MenuBar = ({ editor, title, setTitle, fontFamily, setFontFamily, fontSize,
     `);
     printWindow.document.close();
   };
-
   // ──────────────────────────────────────────────
   // DIRECT EXPORT TO PDF (Main Page Button)
   // ──────────────────────────────────────────────
   // Updated with Pixel-to-MM mapping to prevent empty pages/cutoff
   const handleExportPDF = async () => {
     if (!editor) return;
-
     // 1. Setup jsPDF
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
       format: 'letter' // [215.9, 279.4]
     });
-
     // 2. Prepare content
     const content = cleanHTML(editor.getHTML());
-    
+   
     // 3. Create a temporary container for rendering
     // We use PX here to ensure the browser layout engine renders it exactly as seen on screen.
     // 1 mm = 3.7795 px (at 96 DPI)
     const contentWidthMM = PAGE_WIDTH_MM - (2 * MARGIN_LEFT_RIGHT_MM); // ~155.1mm
     const contentWidthPX = contentWidthMM * 3.7795; // Convert to pixels for the DOM element
-
     const tempContainer = document.createElement('div');
-    tempContainer.style.width = `${contentWidthPX}px`; 
+    tempContainer.style.width = `${contentWidthPX}px`;
     tempContainer.style.padding = '0';
     tempContainer.style.margin = '0';
     tempContainer.style.background = '#ffffff';
@@ -486,9 +446,8 @@ const MenuBar = ({ editor, title, setTitle, fontFamily, setFontFamily, fontSize,
     tempContainer.style.left = '-9999px';
     tempContainer.style.top = '0';
     // Vital: Allow height to expand infinitely so html2canvas sees everything
-    tempContainer.style.height = 'auto'; 
+    tempContainer.style.height = 'auto';
     tempContainer.style.overflow = 'visible';
-
     // Inject styles
     tempContainer.innerHTML = `
       <style>
@@ -500,15 +459,13 @@ const MenuBar = ({ editor, title, setTitle, fontFamily, setFontFamily, fontSize,
       </style>
       ${content}
     `;
-
     document.body.appendChild(tempContainer);
-
     // 4. Render
     // We tell jsPDF: "Take this HTML (rendered at windowWidth pixels) and fit it into 'width' mm on the PDF"
     await doc.html(tempContainer, {
       callback: (pdf) => {
         pdf.save(`${title || 'document'}.pdf`);
-        document.body.removeChild(tempContainer); 
+        document.body.removeChild(tempContainer);
       },
       x: MARGIN_LEFT_RIGHT_MM,
       y: MARGIN_TOP_BOTTOM_MM,
@@ -524,7 +481,6 @@ const MenuBar = ({ editor, title, setTitle, fontFamily, setFontFamily, fontSize,
       }
     });
   };
-
   if (!editor) {
     return (
       <div className="w-full max-w-[215.9mm] mx-auto bg-white border-b shadow-sm sticky top-0 z-50 p-4 text-center text-gray-500">
@@ -532,7 +488,6 @@ const MenuBar = ({ editor, title, setTitle, fontFamily, setFontFamily, fontSize,
       </div>
     );
   }
-
   return (
     <div className="w-full max-w-[215.9mm] mx-auto bg-white border-b shadow-sm sticky top-0 z-50">
       <div className="flex items-center justify-between px-4 py-1 flex-wrap">
@@ -542,7 +497,6 @@ const MenuBar = ({ editor, title, setTitle, fontFamily, setFontFamily, fontSize,
           onChange={e => setTitle(e.target.value)}
           className="w-64 border-none focus:ring-0 text-lg font-medium"
         />
-
         <div className="flex items-center gap-1">
           <Toggle size="sm" pressed={editor.isActive("bold")} onPressedChange={() => editor.chain().focus().toggleBold().run()} disabled={!editor}>
             <Bold className="h-4 w-4" />
@@ -577,7 +531,6 @@ const MenuBar = ({ editor, title, setTitle, fontFamily, setFontFamily, fontSize,
             <AlignJustify className="h-4 w-4" />
           </Toggle>
         </div>
-
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()}>
             <Undo className="h-4 w-4" />
@@ -586,21 +539,20 @@ const MenuBar = ({ editor, title, setTitle, fontFamily, setFontFamily, fontSize,
             <Redo className="h-4 w-4" />
           </Button>
           <Separator orientation="vertical" className="h-6" />
-          
+         
           <Button variant="outline" size="sm" onClick={handlePrintPreview}>
             <Printer className="h-4 w-4 mr-2" />Preview & PDF
           </Button>
-          
+         
           <Button variant="outline" size="sm" onClick={handleExportPDF}>
             <FileText className="h-4 w-4 mr-2" />PDF (Direct)
           </Button>
-
           <Button variant="outline" size="sm" onClick={toggleDictation} disabled={!editor}>
             <Mic className="h-4 w-4 mr-2" />{isListening ? "Stop" : "Dictate"}
           </Button>
-          <Button 
-            variant={drawingMode ? "secondary" : "outline"} 
-            size="sm" 
+          <Button
+            variant={drawingMode ? "secondary" : "outline"}
+            size="sm"
             onClick={toggleDrawingMode}
             className={drawingMode ? "bg-blue-100 border-blue-300" : ""}
           >
@@ -609,7 +561,6 @@ const MenuBar = ({ editor, title, setTitle, fontFamily, setFontFamily, fontSize,
           <Button variant="outline" size="sm" onClick={toggleTemplateDialog}>
             <Palette className="h-4 w-4 mr-2" />Design
           </Button>
-
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="outline" size="sm">
@@ -642,7 +593,6 @@ const MenuBar = ({ editor, title, setTitle, fontFamily, setFontFamily, fontSize,
     </div>
   );
 };
-
 // ──────────────────────────────────────────────
 // Main Editor Component
 // ──────────────────────────────────────────────
@@ -653,11 +603,9 @@ export default function Editors() {
   const [drawingMode, setDrawingMode] = useState(false);
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState("");
-
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const paperRef = useRef<HTMLDivElement>(null); // New ref for the White Page
   const canvasRef = useRef<HTMLCanvasElement>(null);
-
   // ──────────────────────────────────────────────
   // Real-time Pagination Plugin
   // ──────────────────────────────────────────────
@@ -677,18 +625,15 @@ export default function Editors() {
       ];
     },
   });
-
   function updatePageBreaks(view: any) {
     const { state, dispatch } = view;
     if (!state || !dispatch) return;
-
     const tr = state.tr;
     const doc = state.doc;
     let cumulativeHeight = 0;
     const insertPositions: number[] = [];
     const removePositions: number[] = [];
     const currentBreakPositions: number[] = [];
-
     doc.descendants((node: any, pos: number) => {
       if (node.type.name === 'pageBreak') {
         currentBreakPositions.push(pos);
@@ -696,7 +641,6 @@ export default function Editors() {
         return false;
       }
       if (!node.isBlock) return;
-
       let h: number;
       if (node.type.name === 'spacer') {
         h = node.attrs.height || 0;
@@ -706,7 +650,6 @@ export default function Editors() {
         const rect = (dom as HTMLElement).getBoundingClientRect();
         h = rect.height || 20;
       }
-
       if (cumulativeHeight + h > PAGE_CONTENT_HEIGHT_PX && cumulativeHeight > 0) {
         insertPositions.push(pos);
         cumulativeHeight = h;
@@ -714,26 +657,21 @@ export default function Editors() {
         cumulativeHeight += h;
       }
     });
-
     const sortedCurrent = [...currentBreakPositions].sort((a, b) => a - b);
     const sortedNew = [...insertPositions].sort((a, b) => a - b);
     if (JSON.stringify(sortedCurrent) === JSON.stringify(sortedNew)) {
       return;
     }
-
     removePositions.reverse().forEach(pos => {
       tr.delete(pos, pos + 1);
     });
-
     insertPositions.reverse().forEach(pos => {
       tr.insert(pos, state.schema.nodes.pageBreak.create());
     });
-
     if (tr.docChanged) {
       dispatch(tr.scrollIntoView());
     }
   }
-
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -750,45 +688,38 @@ export default function Editors() {
     content: '<p></p>',
     immediatelyRender: false,
   });
-
   useEffect(() => {
     if (editor && selectedTemplate) {
-      editor.commands.setContent(templates[selectedTemplate] || '<p></p>', false);
+      editor.commands.setContent(templates[selectedTemplate] || '<p></p>', { emitUpdate: false });
     }
   }, [selectedTemplate, editor]);
-
   // ──────────────────────────────────────────────
   // Drawing Canvas Logic (Fixing Dead Zones)
   // ──────────────────────────────────────────────
   useEffect(() => {
     // Only run if drawing mode is active and we have refs
     if (!drawingMode || !canvasRef.current || !paperRef.current) return;
-
     const canvas = canvasRef.current;
     const paper = paperRef.current;
-    
+   
     // Set canvas dimensions to match the WHITE PAPER, not the screen
     canvas.width = paper.offsetWidth;
     canvas.height = paper.offsetHeight;
-    
+   
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-
     // CALCULATE DEAD ZONES IN PIXELS
     // We can use the logic from Constants (mm -> px)
     const deadZoneTop = MARGIN_TOP_BOTTOM_MM * PX_PER_MM;
     const deadZoneLeft = MARGIN_LEFT_RIGHT_MM * PX_PER_MM;
     const contentWidth = canvas.width - (2 * deadZoneLeft);
     const contentHeight = canvas.height - (2 * deadZoneTop);
-
     // CLIP THE CONTEXT
     // This physically prevents drawing outside the allowed content area (white space minus margins)
     ctx.beginPath();
     ctx.rect(deadZoneLeft, deadZoneTop, contentWidth, contentHeight);
-    ctx.clip(); 
-
+    ctx.clip();
     let isDrawing = false;
-
     const getPos = (e: MouseEvent) => {
       const rect = canvas.getBoundingClientRect();
       return {
@@ -796,57 +727,48 @@ export default function Editors() {
         y: e.clientY - rect.top
       };
     };
-
     const startDrawing = (e: MouseEvent) => {
       isDrawing = true;
       const { x, y } = getPos(e);
       ctx.beginPath();
       ctx.moveTo(x, y);
     };
-
     const stopDrawing = () => {
       isDrawing = false;
       ctx.beginPath(); // Reset path to prevent connecting separate lines
     };
-
     const draw = (e: MouseEvent) => {
       if (!isDrawing) return;
       const { x, y } = getPos(e);
-
       ctx.lineWidth = 2;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       ctx.strokeStyle = '#000000'; // Black ink
-
       ctx.lineTo(x, y);
       ctx.stroke();
     };
-
     // Attach listeners
     canvas.addEventListener('mousedown', startDrawing);
     window.addEventListener('mouseup', stopDrawing); // Window ensures drag release detection
     canvas.addEventListener('mousemove', draw);
-
     return () => {
       canvas.removeEventListener('mousedown', startDrawing);
       window.removeEventListener('mouseup', stopDrawing);
       canvas.removeEventListener('mousemove', draw);
     };
   }, [drawingMode, editor]); // Re-run if drawing mode or editor changes (resizes)
-
   const handleInsertDrawing = () => {
     if (!canvasRef.current || !editor) return;
-    // Current approach converts whole canvas. 
+    // Current approach converts whole canvas.
     // Ideally, crop to content, but this works for basic usage.
     const dataUrl = canvasRef.current.toDataURL('image/png');
     editor.commands.setImage({ src: dataUrl });
     setDrawingMode(false);
-    
+   
     // Clear canvas
     const ctx = canvasRef.current.getContext('2d');
     ctx?.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
   };
-
   return (
     <div className="flex flex-col h-screen bg-gray-200">
       <MenuBar
@@ -858,7 +780,6 @@ export default function Editors() {
         toggleDrawingMode={() => setDrawingMode(!drawingMode)}
         toggleTemplateDialog={() => setIsTemplateDialogOpen(true)}
       />
-
       {/* Main scrollable area */}
       <div className="flex-1 overflow-y-auto py-12 px-12" ref={editorContainerRef} style={{ fontFamily, fontSize: `${fontSize}pt` }}>
         {!editor ? (
@@ -867,12 +788,12 @@ export default function Editors() {
           </div>
         ) : (
           /* PAPER WRAPPER (paperRef) */
-          <div 
-            ref={paperRef} 
+          <div
+            ref={paperRef}
             className="max-w-[215.9mm] mx-auto bg-white shadow-lg relative prose prose-sm sm:prose lg:prose-lg"
           >
             <EditorContent editor={editor} />
-            
+           
             {drawingMode && (
               <>
                 {/* Canvas Overlay - strictly positioned over the paper */}
@@ -881,7 +802,7 @@ export default function Editors() {
                   className="absolute inset-0 z-10 pointer-events-auto"
                   style={{ cursor: 'crosshair' }}
                 />
-                
+               
                 {/* Floating Action Button for Done */}
                 <Button
                   onClick={handleInsertDrawing}
@@ -895,7 +816,6 @@ export default function Editors() {
           </div>
         )}
       </div>
-
       <Dialog open={isTemplateDialogOpen} onOpenChange={setIsTemplateDialogOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Select Template</DialogTitle></DialogHeader>
