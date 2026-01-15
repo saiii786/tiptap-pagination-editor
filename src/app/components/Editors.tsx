@@ -65,9 +65,16 @@ const Spacer = Node.create({
   name: 'spacer',
   group: 'block',
   atom: true,
-  content: '', // Explicitly make it a leaf node (no children)
+  // FIXED: Removed 'isLeaf: true' to solve build error. 
+  // 'atom: true' is sufficient for Tiptap to treat it as a leaf.
   draggable: true,
-  attrs: { height: { default: 0 } },
+  addAttributes() {
+    return {
+      height: {
+        default: 0,
+      },
+    };
+  },
   parseHTML() {
     return [{
       tag: 'div[data-type="spacer"]',
@@ -293,6 +300,7 @@ const MenuBar = ({ editor, title, setTitle, fontFamily, setFontFamily, fontSize,
               margin: 0;
               padding: 20px;
               display: flex;
+              flex-direction: column;
               flex-direction: column;
               align-items: center;
               font-family: sans-serif;
@@ -670,36 +678,6 @@ export default function Editors() {
     },
   });
 
-  function measureHeight(view: any, from: number, to: number) {
-    const start = view.domAtPos(from);
-    const end = view.domAtPos(to);
-    const range = document.createRange();
-    range.setStart(start.node, start.offset);
-    range.setEnd(end.node, end.offset);
-    const rect = range.getBoundingClientRect();
-    return rect.height;
-  }
-
-  function findSplitOffset(view: any, pos: number, remaining: number) {
-    const { state } = view;
-    const node = state.doc.nodeAt(pos);
-    if (!node) return 0;
-    const contentSize = node.content.size;
-    let low = 0, high = contentSize;
-    while (low < high) {
-      const mid = Math.floor((low + high) / 2);
-      const fromPos = pos + 1;
-      const toPos = pos + 1 + mid;
-      const height = measureHeight(view, fromPos, toPos);
-      if (height <= remaining) {
-        low = mid + 1;
-      } else {
-        high = mid;
-      }
-    }
-    return low - 1;
-  }
-
   function updatePageBreaks(view: any) {
     const { state, dispatch } = view;
     if (!state || !dispatch) return;
@@ -707,11 +685,14 @@ export default function Editors() {
     const tr = state.tr;
     const doc = state.doc;
     let cumulativeHeight = 0;
-    const actions: { type: string; pos: number; from?: number; to?: number }[] = [];
+    const insertPositions: number[] = [];
+    const removePositions: number[] = [];
+    const currentBreakPositions: number[] = [];
 
     doc.descendants((node: any, pos: number) => {
       if (node.type.name === 'pageBreak') {
-        actions.push({ type: 'remove', from: pos, to: pos + node.nodeSize });
+        currentBreakPositions.push(pos);
+        removePositions.push(pos);
         return false;
       }
       if (!node.isBlock) return;
@@ -721,45 +702,33 @@ export default function Editors() {
         h = node.attrs.height || 0;
       } else {
         const dom = view.nodeDOM(pos);
-        h = dom ? dom.getBoundingClientRect().height : 20;
-      }
-
-      const remaining = PAGE_CONTENT_HEIGHT_PX - cumulativeHeight;
-
-      if (node.type.name === 'paragraph' && h > remaining && remaining > 0) {
-        const splitOffset = findSplitOffset(view, pos, remaining);
-        if (splitOffset > 0) {
-          const splitPmPos = pos + 1 + splitOffset;
-          actions.push({ type: 'split', pos: splitPmPos });
-          actions.push({ type: 'insertBreak', pos: splitPmPos }); // Insert after split
-          cumulativeHeight = h - remaining;
-          return false;
-        }
+        if (!dom) return;
+        const rect = (dom as HTMLElement).getBoundingClientRect();
+        h = rect.height || 20;
       }
 
       if (cumulativeHeight + h > PAGE_CONTENT_HEIGHT_PX && cumulativeHeight > 0) {
-        actions.push({ type: 'insertBreak', pos: pos });
+        insertPositions.push(pos);
         cumulativeHeight = h;
       } else {
         cumulativeHeight += h;
       }
     });
 
-    // Sort actions by pos descending to apply from end to start
-    actions.sort((a, b) => b.pos - a.pos);
+    const sortedCurrent = [...currentBreakPositions].sort((a, b) => a - b);
+    const sortedNew = [...insertPositions].sort((a, b) => a - b);
+    if (JSON.stringify(sortedCurrent) === JSON.stringify(sortedNew)) {
+      return;
+    }
 
-    // Apply actions
-    actions.forEach(action => {
-      if (action.type === 'remove' && action.from !== undefined && action.to !== undefined) {
-        tr.delete(action.from, action.to);
-      } else if (action.type === 'split') {
-        tr.split(action.pos);
-      } else if (action.type === 'insertBreak') {
-        tr.insert(action.pos, state.schema.nodes.pageBreak.create());
-      }
+    removePositions.reverse().forEach(pos => {
+      tr.delete(pos, pos + 1);
     });
 
-    // Prevent unnecessary dispatches
+    insertPositions.reverse().forEach(pos => {
+      tr.insert(pos, state.schema.nodes.pageBreak.create());
+    });
+
     if (tr.docChanged) {
       dispatch(tr.scrollIntoView());
     }
