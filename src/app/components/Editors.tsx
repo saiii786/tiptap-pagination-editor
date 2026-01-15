@@ -1,5 +1,195 @@
 "use client";
 
+// import { useEditor, EditorContent } from "@tiptap/react";
+// import { Extension, Node } from "@tiptap/core";
+// import { Plugin, TextSelection } from "@tiptap/pm/state";
+// import StarterKit from "@tiptap/starter-kit";
+// import TextAlign from "@tiptap/extension-text-align";
+// import Highlight from "@tiptap/extension-highlight";
+// import Image from "@tiptap/extension-image";
+// import CharacterCount from "@tiptap/extension-character-count";
+// import Placeholder from "@tiptap/extension-placeholder";
+// import {
+//   Bold, Italic, List, ListOrdered, Heading1, Heading2, Undo, Redo, Printer,
+//   AlignLeft, AlignCenter, AlignRight, AlignJustify, Mic, Settings, Palette, PenTool, FileText
+// } from "lucide-react";
+// import { Button } from "@/components/ui/button";
+// import { Toggle } from "@/components/ui/toggle";
+// import { Separator } from "@/components/ui/separator";
+// import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+// import { Input } from "@/components/ui/input";
+// import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+// import { useState, useEffect, useRef } from "react";
+// // jsPDF is imported here for the direct export, but we use CDNs for the preview window
+// import jsPDF from 'jspdf'; 
+
+// // ──────────────────────────────────────────────
+// // Constants
+// // ──────────────────────────────────────────────
+// const PAGE_WIDTH_MM = 215.9;
+// const PAGE_HEIGHT_MM = 279.4;
+// const MARGIN_TOP_BOTTOM_MM = 35.4;     
+// const MARGIN_LEFT_RIGHT_MM = 30.4;     
+// const PX_PER_MM = 3.7795;
+// const PAGE_CONTENT_HEIGHT_PX = (PAGE_HEIGHT_MM * PX_PER_MM) - (2 * (MARGIN_TOP_BOTTOM_MM * PX_PER_MM));
+
+// // Approximate average space width multiplier
+// const AVG_SPACE_WIDTH_FACTOR = 0.25; 
+
+// // Templates
+// const templates: Record<string, string> = {
+//   officialLetter: `<h1>[Company Name]</h1>
+// <p>[Your Address]<br>[City, State ZIP]<br>[Email] | [Phone]<br>[Date]</p>
+// <p>[Recipient Name]<br>[Recipient Title]<br>[Company Name]<br>[Address]</p>
+// <p>Subject: [Subject Line]</p>
+// <p>Dear [Recipient],</p>
+// <p>[Body of letter...]</p>
+// <p>Sincerely,<br>[Your Name]<br>[Your Title]</p>`,
+// };
+
+// // Custom Page Break Node
+// const PageBreak = Node.create({
+//   name: 'pageBreak',
+//   group: 'block',
+//   atom: true,
+//   selectable: false,
+//   draggable: false,
+//   parseHTML() { return [{ tag: 'div[data-type="page-break"]' }]; },
+//   renderHTML() {
+//     return ['div', { 'data-type': 'page-break', class: 'page-break' }];
+//   },
+// });
+
+// // Custom Spacer Node
+// const Spacer = Node.create({
+//   name: 'spacer',
+//   group: 'block',
+//   atom: true,
+//   // FIXED: Removed 'isLeaf: true' to solve build error. 
+//   // 'atom: true' is sufficient for Tiptap to treat it as a leaf.
+//   draggable: true,
+//   addAttributes() {
+//     return {
+//       height: {
+//         default: 0,
+//       },
+//     };
+//   },
+//   parseHTML() {
+//     return [{
+//       tag: 'div[data-type="spacer"]',
+//       getAttrs: (el: any) => ({ height: parseFloat(el.style.height) || 0 }),
+//     }];
+//   },
+//   renderHTML({ attrs = {} }) {
+//     const height = attrs.height ?? 0;
+//     return ['div', { 'data-type': 'spacer', style: `height: ${height}px; min-height: ${height}px;` }];
+//   },
+// });
+
+// // Free Cursor Extension
+// const FreeCursor = Extension.create({
+//   name: 'freeCursor',
+//   addProseMirrorPlugins() {
+//     return [
+//       new Plugin({
+//         props: {
+//           handleClick(view, pos, event) {
+//             const doc = view.state.doc;
+//             const pmRect = view.dom.getBoundingClientRect();
+//             const paddingLeft = parseFloat(getComputedStyle(view.dom).paddingLeft);
+//             const paddingRight = parseFloat(getComputedStyle(view.dom).paddingRight);
+//             const contentWidth = pmRect.width - paddingLeft - paddingRight;
+
+//             // Ignore clicks in dead zones
+//             if (
+//               event.clientX < pmRect.left + paddingLeft ||
+//               event.clientX > pmRect.left + paddingLeft + contentWidth
+//             ) {
+//               return true; 
+//             }
+
+//             const coordResult = view.posAtCoords({ left: event.clientX, top: event.clientY });
+//             if (!coordResult) return false;
+//             const { pos: clickPos, inside } = coordResult;
+
+//             if (inside >= 0) {
+//               const tr = view.state.tr;
+//               tr.setSelection(TextSelection.create(doc, clickPos));
+//               view.dispatch(tr);
+//               view.focus();
+//               return true;
+//             }
+
+//             if (clickPos >= doc.content.size) {
+//               const endCoord = view.coordsAtPos(doc.content.size);
+//               const addHeight = event.clientY - endCoord.top;
+//               if (addHeight > 0) {
+//                 const tr = view.state.tr;
+//                 const spacer = view.state.schema.nodes.spacer.create({ height: addHeight });
+//                 const horizontalOffsetPx = event.clientX - pmRect.left - paddingLeft;
+//                 const fontSizePt = parseInt(getComputedStyle(view.dom).fontSize) || 12;
+//                 const spaceWidthPx = fontSizePt * AVG_SPACE_WIDTH_FACTOR;
+//                 const numSpaces = Math.floor(horizontalOffsetPx / spaceWidthPx);
+//                 const paddingSpaces = '\u00A0'.repeat(numSpaces);
+
+//                 const para = view.state.schema.nodes.paragraph.create(null, view.state.schema.text(paddingSpaces));
+//                 tr.insert(doc.content.size, [spacer, para]);
+//                 const cursorPos = doc.content.size + spacer.nodeSize + numSpaces + 1;
+//                 tr.setSelection(TextSelection.create(tr.doc, cursorPos));
+//                 view.dispatch(tr);
+//                 view.focus();
+//                 return true;
+//               }
+//               return false;
+//             }
+
+//             const nodeAt = doc.nodeAt(clickPos);
+//             if (nodeAt && nodeAt.type.name === 'spacer') {
+//               const dom = view.nodeDOM(clickPos);
+//               if (!dom) return false;
+//               const rect = (dom as HTMLElement).getBoundingClientRect();
+//               const relativeY = event.clientY - rect.top;
+//               const totalH = nodeAt.attrs.height;
+
+//               if (relativeY >= 0 && relativeY <= totalH) {
+//                 const tr = view.state.tr;
+//                 const spacerAbove = relativeY > 0 ? view.state.schema.nodes.spacer.create({ height: relativeY }) : null;
+//                 const spacerBelow = (totalH - relativeY) > 0 ? view.state.schema.nodes.spacer.create({ height: totalH - relativeY }) : null;
+//                 const horizontalOffsetPx = event.clientX - rect.left;
+//                 const fontSizePt = parseInt(getComputedStyle(view.dom).fontSize) || 12;
+//                 const spaceWidthPx = fontSizePt * AVG_SPACE_WIDTH_FACTOR;
+//                 const numSpaces = Math.floor(horizontalOffsetPx / spaceWidthPx);
+//                 const paddingSpaces = '\u00A0'.repeat(numSpaces);
+
+//                 const para = view.state.schema.nodes.paragraph.create(null, view.state.schema.text(paddingSpaces));
+//                 const fragment: any[] = [];
+//                 if (spacerAbove) fragment.push(spacerAbove);
+//                 fragment.push(para);
+//                 if (spacerBelow) fragment.push(spacerBelow);
+//                 tr.replaceWith(clickPos, clickPos + nodeAt.nodeSize, fragment);
+
+//                 let offset = 0;
+//                 if (spacerAbove) offset += spacerAbove.nodeSize;
+//                 const paraStart = clickPos + offset;
+//                 const cursorPos = paraStart + numSpaces + 1;
+//                 tr.setSelection(TextSelection.create(tr.doc, cursorPos));
+//                 view.dispatch(tr);
+//                 view.focus();
+//                 return true;
+//               }
+//             }
+
+//             return false;
+//           },
+//         },
+//       }),
+//     ];
+//   },
+// });
+
+"use client";
+
 import { useEditor, EditorContent } from "@tiptap/react";
 import { Extension, Node } from "@tiptap/core";
 import { Plugin, TextSelection } from "@tiptap/pm/state";
@@ -20,7 +210,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState, useEffect, useRef } from "react";
-// jsPDF is imported here for the direct export, but we use CDNs for the preview window
 import jsPDF from 'jspdf'; 
 
 // ──────────────────────────────────────────────
@@ -33,7 +222,6 @@ const MARGIN_LEFT_RIGHT_MM = 30.4;
 const PX_PER_MM = 3.7795;
 const PAGE_CONTENT_HEIGHT_PX = (PAGE_HEIGHT_MM * PX_PER_MM) - (2 * (MARGIN_TOP_BOTTOM_MM * PX_PER_MM));
 
-// Approximate average space width multiplier
 const AVG_SPACE_WIDTH_FACTOR = 0.25; 
 
 // Templates
@@ -60,34 +248,39 @@ const PageBreak = Node.create({
   },
 });
 
-// Custom Spacer Node
+// Custom Spacer Node - FIXED VERSION
 const Spacer = Node.create({
   name: 'spacer',
   group: 'block',
   atom: true,
-  // FIXED: Removed 'isLeaf: true' to solve build error. 
-  // 'atom: true' is sufficient for Tiptap to treat it as a leaf.
   draggable: true,
+
   addAttributes() {
     return {
       height: {
         default: 0,
+        parseHTML: element => parseFloat(element.style.height) || 0,
+        renderHTML: attributes => ({
+          style: `height: ${attributes.height}px; min-height: ${attributes.height}px;`
+        }),
       },
     };
   },
+
   parseHTML() {
-    return [{
-      tag: 'div[data-type="spacer"]',
-      getAttrs: (el: any) => ({ height: parseFloat(el.style.height) || 0 }),
-    }];
+    return [
+      {
+        tag: 'div[data-type="spacer"]',
+      },
+    ];
   },
-  renderHTML({ attrs = {} }) {
-    const height = attrs.height ?? 0;
-    return ['div', { 'data-type': 'spacer', style: `height: ${height}px; min-height: ${height}px;` }];
+
+  renderHTML({ HTMLAttributes }) {
+    return ['div', { 'data-type': 'spacer', ...HTMLAttributes }, 0];
   },
 });
 
-// Free Cursor Extension
+// Free Cursor Extension (unchanged)
 const FreeCursor = Extension.create({
   name: 'freeCursor',
   addProseMirrorPlugins() {
@@ -101,7 +294,6 @@ const FreeCursor = Extension.create({
             const paddingRight = parseFloat(getComputedStyle(view.dom).paddingRight);
             const contentWidth = pmRect.width - paddingLeft - paddingRight;
 
-            // Ignore clicks in dead zones
             if (
               event.clientX < pmRect.left + paddingLeft ||
               event.clientX > pmRect.left + paddingLeft + contentWidth
