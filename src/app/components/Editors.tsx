@@ -65,7 +65,8 @@ const Spacer = Node.create({
   name: 'spacer',
   group: 'block',
   atom: true,
-  isLeaf: true,
+  // FIXED: Removed 'isLeaf: true' to solve build error. 
+  // 'atom: true' is sufficient for Tiptap to treat it as a leaf.
   draggable: true,
   attrs: { height: { default: 0 } },
   parseHTML() {
